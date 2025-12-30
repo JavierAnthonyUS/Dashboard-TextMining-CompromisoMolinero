@@ -1,0 +1,201 @@
+---
+title: "Análisis de Plan COMPROMISO MOLINERO"
+author: "JAVIER ANTHONY"
+date: "2025-12-10"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    theme: cosmo
+runtime: shiny
+---
+```{r setup, include=FALSE}
+library(pacman)
+p_load(tidyverse, tidytext, tm, wordcloud, pdftools, 
+       flexdashboard, DT, knitr, kableExtra, plotly, 
+       gganimate, readxl, stringr, forcats)
+
+options(scipen = 999)
+
+# Leer PDF
+texto_pdf <- pdf_text("COMPROMISO MOLINERO.pdf")
+texto_completo <- paste(texto_pdf, collapse = " ")
+
+# Limpiar
+texto_completo <- str_remove_all(texto_completo, "COMPROMISO")
+texto_completo <- str_remove_all(texto_completo, "MOLINERO")
+texto_completo <- str_remove_all(texto_completo, "[:digit:]+")
+
+palabras_omitir <- c("plan", "gobierno", "rectorado", "compromiso", "molinero",
+                     "visión", "universidad", "principios", "propuesta",
+                     "eje", "objetivo")
+
+# Tokenizar
+texto_tokens <- tibble(text = texto_completo) %>% 
+  unnest_tokens(Token, text) %>% 
+  mutate(Token = removeNumbers(Token))
+
+# Stopwords
+stopwords_es_1 <- read_excel("CustomStopWords.xlsx")
+names(stopwords_es_1) <- c("Token", "Fuente")
+
+stopwords_adicionales <- tibble(Token = palabras_omitir, Fuente = "Omitir")
+stopwords_es <- rbind(stopwords_es_1, stopwords_adicionales)
+stopwords_es <- stopwords_es[!duplicated(stopwords_es$Token), ]
+
+texto_limpio <- texto_tokens %>% 
+  anti_join(stopwords_es, by = "Token") %>%
+  filter(nchar(Token) > 2)
+
+# Frecuencias
+frecuencias <- texto_limpio %>% count(Token, sort = TRUE)
+
+# Sentimientos
+sentimientos <- read.delim("sentimientos_2.txt", encoding = "UTF-8")
+sentimientos <- as_tibble(sentimientos) %>% distinct()
+
+texto_sentimientos <- texto_limpio %>% 
+  inner_join(sentimientos, by = c("Token" = "palabra"))
+
+conteo_sentimientos <- texto_sentimientos %>% count(sentimiento, sort = TRUE)
+sentimiento_principal <- conteo_sentimientos %>% slice(1) %>% pull(sentimiento)
+frecuencia_principal <- conteo_sentimientos %>% slice(1) %>% pull(n)
+```
+
+# Biografía {data-icon="fa-user"}
+
+## Column {data-width=450}
+
+### **Fotografía del Candidato**
+
+<img src="https://ctivitae.concytec.gob.pe/appDirectorioCTI/UploadFotoPath.do?tipo=visualizar_archivo&id_investigador=3945&ruta=/documents/docInvestigadores/3945/imagenes/PB260590.JPG&content_type=image/jpeg" style="width:100%; height:auto; max-height:700px; object-fit:cover;" />
+
+## Column {data-width=550}
+
+### **GARCIA BENDEZÚ SADY JAVIER**
+
+**Candidato al Rectorado UNALM**
+
+**Lista 2 - COMPROMISO MOLINERO**
+
+**Período 2026-2030**
+
+---
+
+#### Biografía
+
+Ingeniero agrónomo molinero, docente e investigador de la UNALM con especialidad en suelos. Dedicado al estudio de la microbiología del suelo, la fertilidad biológica de los suelos y la nutrición vegetal. Mis áreas de investigación incluyen las relaciones suelo-planta-microorganismos, el rol de la población microbiana en la disponibilidad de nutrientes para las plantas y el reciclaje del carbono en el suelo, con enfoque en los agroecosistemas, especialmente de costa y altoandinos.
+
+---
+
+#### Experiencia Laboral
+
+**UNIVERSIDAD NACIONAL AGRARIA LA MOLINA**
+
+- **Docente** (Septiembre 1997 - Actualidad)
+  - Profesor Principal a D.E., Departamento Académico de Suelos
+  - Facultad de Agronomía
+  - Encargado de la Unidad de Servicios en Análisis Microbiológicos
+
+- **Director del Departamento Académico de Suelos** (Abril 2019 - Abril 2021)
+
+- **Jefe de Laboratorio de Análisis de Suelos, Plantas, Aguas y Fertilizantes** (Julio 2013 - Junio 2019)
+  - Departamento Académico de Suelos
+
+---
+
+#### Equipo de Gobierno
+
+- **Rector:** Sady García Bendezú
+- **Vicerrector Académico:** Rino Sotomayor Ruíz  
+- **Vicerrectora de Investigación:** Fanny Ludeña Urquizo
+
+# Frecuencias {data-icon="fa-chart-bar"}
+
+## Column {data-width=500}
+
+### **Palabras Más Frecuentes**
+```{r}
+frecuencias %>% 
+  top_n(15, n) %>%
+  arrange(desc(n)) %>%
+  rename(Palabra = Token, Frecuencia = n) %>%
+  kable(align = c("l", "c")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE,
+                font_size = 14) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#2E7D32") %>%
+  column_spec(1, bold = TRUE) %>%
+  column_spec(2, color = "white", background = "#4CAF50")
+```
+
+### **Nube de Palabras**
+```{r}
+set.seed(2024)
+wordcloud(words = frecuencias$Token,
+          freq = frecuencias$n,
+          min.freq = 3,
+          max.words = 80,
+          random.order = FALSE,
+          colors = brewer.pal(8, "Dark2"),
+          scale = c(3.5, 0.5))
+```
+
+## Column {data-width=500}
+
+### **Gráfico Animado - Top 10**
+```{r}
+top10 <- frecuencias %>% top_n(10, n)
+
+p <- ggplot(top10, aes(x = reorder(Token, n), y = n, fill = Token)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(title = "Top 10 Palabras Más Frecuentes",
+       x = "Palabra", y = "Frecuencia") +
+  theme_minimal() +
+  scale_fill_viridis_d()
+
+ggplotly(p)
+```
+
+# Sentimientos {data-icon="fa-smile"}
+
+## Row {data-height=200}
+
+### **Sentimiento Más Frecuente**
+```{r}
+valueBox(
+  value = toupper(sentimiento_principal),
+  icon = "fa-heart",
+  caption = paste("Frecuencia:", frecuencia_principal),
+  color = "success"
+)
+```
+
+## Row {data-height=800}
+
+### **Frecuencia por Sentimiento**
+```{r}
+p_sent <- conteo_sentimientos %>%
+  ggplot(aes(x = reorder(sentimiento, n), y = n, fill = sentimiento)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = n), hjust = -0.2, size = 5) +
+  coord_flip() +
+  labs(title = "Análisis de Sentimientos",
+       x = "Sentimiento", y = "Frecuencia") +
+  theme_minimal() +
+  scale_fill_manual(values = c(
+    "confianza" = "#4CAF50",
+    "positivo" = "#2196F3",
+    "anticipación" = "#FF9800",
+    "alegría" = "#FFEB3B",
+    "negativo" = "#F44336",
+    "tristeza" = "#9E9E9E",
+    "miedo" = "#673AB7",
+    "ira" = "#E91E63",
+    "sorpresa" = "#00BCD4",
+    "asco" = "#795548"
+  ))
+
+ggplotly(p_sent)
+```

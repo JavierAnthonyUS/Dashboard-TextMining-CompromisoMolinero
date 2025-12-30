@@ -1,0 +1,12 @@
+name: DashboardAnalisisCompromisoMolinero
+title: DashboardAnalisisCompromisoMolinero
+username: javieranthonyuracosilva
+account: javieranthonyuracosilva
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16287778
+bundleId: 11304237
+url: https://javieranthonyuracosilva.shinyapps.io/DashboardAnalisisCompromisoMolinero/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
